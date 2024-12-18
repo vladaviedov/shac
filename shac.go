@@ -84,9 +84,18 @@ func main() {
 		os.Exit(codeParser)
 	}
 
+	assetPaths, err := assetLocations(reader)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
+		os.Exit(codeParser)
+	}
+
 	// TODO: implemenet
 	fmt.Printf("outDir: %v\n", outDir)
 	fmt.Printf("name: %v\n", name)
+	for _, path := range assetPaths {
+		fmt.Printf("path: %v\n", path)
+	}
 }
 
 func usage(toFile *os.File) {
@@ -118,6 +127,34 @@ func pageName(r *bufio.Reader) (string, error) {
 	}
 
 	name := strings.Join(parts[1:], " ")
-
 	return strings.Trim(name, " \t\n"), nil
+}
+
+func assetLocations(r *bufio.Reader) ([]string, error) {
+	var assets []string
+	for {
+		line, err := r.ReadString('\n')
+		if err != nil {
+			return nil, err
+		}
+
+		line = strings.Trim(line, " \t\n")
+		if line == "@html" {
+			break
+		}
+
+		if !strings.HasPrefix(line, "@asset") {
+			return nil, errors.New("syntax error: invalid directive")
+		}
+
+		parts := strings.Split(line, " ")
+		if len(parts) < 2 {
+			return nil, errors.New("syntax error: no input given to @asset")
+		}
+
+		name := strings.Join(parts[1:], " ")
+		assets = append(assets, name)
+	}
+
+	return assets, nil
 }
