@@ -2,9 +2,12 @@ package main
 
 import (
 	"bufio"
+	"crypto/sha1"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/jessevdk/go-flags"
@@ -77,6 +80,13 @@ func main() {
 		outDir = opts.OutputDirectory
 	}
 
+	assetDir := filepath.Join(outDir, "assets")
+	err = os.MkdirAll(assetDir, 0755)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to create asset directory: %s\n", err.Error())
+		os.Exit(codeSystem)
+	}
+
 	reader := bufio.NewReader(inStream)
 	name, err := pageName(reader)
 	if err != nil {
@@ -84,7 +94,7 @@ func main() {
 		os.Exit(codeParser)
 	}
 
-	assetPaths, err := assetLocations(reader)
+	assets, err := processAssets(assetDir, reader)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 		os.Exit(codeParser)
@@ -93,8 +103,8 @@ func main() {
 	// TODO: implemenet
 	fmt.Printf("outDir: %v\n", outDir)
 	fmt.Printf("name: %v\n", name)
-	for _, path := range assetPaths {
-		fmt.Printf("path: %v\n", path)
+	for _, hash := range assets {
+		fmt.Printf("path: %v\n", hash)
 	}
 }
 
@@ -130,7 +140,7 @@ func pageName(r *bufio.Reader) (string, error) {
 	return strings.Trim(name, " \t\n"), nil
 }
 
-func assetLocations(r *bufio.Reader) ([]string, error) {
+func processAssets(assetDir string, r *bufio.Reader) ([]string, error) {
 	var assets []string
 	for {
 		line, err := r.ReadString('\n')
@@ -153,8 +163,33 @@ func assetLocations(r *bufio.Reader) ([]string, error) {
 		}
 
 		name := strings.Join(parts[1:], " ")
-		assets = append(assets, name)
+		assetHash, err := createAsset(assetDir, name)
+		if err != nil {
+			return nil, err
+		}
+
+		assets = append(assets, assetHash)
 	}
 
 	return assets, nil
+}
+
+func createAsset(assetDir string, path string) (string, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+
+	rawHash := sha1.Sum(content)
+	hash := hex.EncodeToString(rawHash[:])
+
+	assetPath := filepath.Join(assetDir, hash)
+	asset, err := os.Create(assetPath)
+
+	_, err = asset.Write(content)
+	if err != nil {
+		return "", err
+	}
+
+	return hash, nil
 }
