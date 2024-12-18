@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/jessevdk/go-flags"
 )
@@ -51,6 +54,18 @@ func main() {
 		os.Exit(codeUsage)
 	}
 
+	var inStream *os.File
+	if opts.Stdin {
+		inStream = os.Stdin
+	} else {
+		inStream, err = os.Open(args[0])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to open source file: %s\n", err.Error())
+			os.Exit(codeSystem)
+		}
+	}
+	defer inStream.Close()
+
 	var outDir string
 	if opts.OutputDirectory == "" {
 		outDir, err = os.Getwd()
@@ -62,8 +77,16 @@ func main() {
 		outDir = opts.OutputDirectory
 	}
 
+	reader := bufio.NewReader(inStream)
+	name, err := pageName(reader)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
+		os.Exit(codeParser)
+	}
+
 	// TODO: implemenet
 	fmt.Printf("outDir: %v\n", outDir)
+	fmt.Printf("name: %v\n", name)
 }
 
 func usage(toFile *os.File) {
@@ -77,4 +100,24 @@ func usage(toFile *os.File) {
 
 func version() {
 	fmt.Printf("shac version %s\n", Version)
+}
+
+func pageName(r *bufio.Reader) (string, error) {
+	line, err := r.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+
+	if !strings.HasPrefix(line, "@page") {
+		return "", errors.New("syntax error: no @page found at line 1")
+	}
+
+	parts := strings.Split(line, " ")
+	if len(parts) < 2 {
+		return "", errors.New("syntax error: no input given to @page")
+	}
+
+	name := strings.Join(parts[1:], " ")
+
+	return strings.Trim(name, " \t\n"), nil
 }
