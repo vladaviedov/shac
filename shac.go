@@ -6,8 +6,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/jessevdk/go-flags"
@@ -34,6 +37,13 @@ const (
 	// Error while parsing source file
 	codeParser = 3
 )
+
+// Placeholder asset paths
+const placeholderPattern = `"@\d@"`
+
+// Path to asset dir from output dir
+// TODO: convert into argument?
+const pathToAssets = "assets"
 
 func main() {
 	parser := flags.NewParser(&opts, flags.Default^flags.HelpFlag^flags.PrintErrors)
@@ -80,7 +90,7 @@ func main() {
 		outDir = opts.OutputDirectory
 	}
 
-	assetDir := filepath.Join(outDir, "assets")
+	assetDir := filepath.Join(outDir, pathToAssets)
 	err = os.MkdirAll(assetDir, 0755)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create asset directory: %s\n", err.Error())
@@ -100,11 +110,10 @@ func main() {
 		os.Exit(codeParser)
 	}
 
-	// TODO: implemenet
-	fmt.Printf("outDir: %v\n", outDir)
-	fmt.Printf("name: %v\n", name)
-	for _, hash := range assets {
-		fmt.Printf("path: %v\n", hash)
+	err = finalizeDocument(filepath.Join(outDir, name), reader, assets)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to create output file: %s\n", err.Error())
+		os.Exit(codeSystem)
 	}
 }
 
@@ -192,4 +201,39 @@ func createAsset(assetDir string, path string) (string, error) {
 	}
 
 	return hash, nil
+}
+
+func finalizeDocument(path string, r *bufio.Reader, assets []string) error {
+	reg, err := regexp.Compile(placeholderPattern)
+	if err != nil {
+		panic(err)
+	}
+
+	inputDoc, err := io.ReadAll(r)
+	if err != nil {
+		return err
+	}
+
+	doc := reg.ReplaceAllFunc(inputDoc, func(placeholder []byte) []byte {
+		indexStr := placeholder[2:(len(placeholder) - 2)]
+		index, err := strconv.Atoi(string(indexStr))
+
+		// Regex should ensure that number can be parsed
+		if err != nil {
+			panic(err)
+		}
+
+		// Out of bounds - do nothing
+		if index >= len(assets) {
+			return placeholder
+		}
+
+		builder := new(strings.Builder)
+		builder.WriteString("\"")
+		builder.WriteString(filepath.Join(pathToAssets, assets[index]))
+		builder.WriteString("\"")
+		return []byte(builder.String())
+	})
+
+	return os.WriteFile(path, doc, 0644)
 }
