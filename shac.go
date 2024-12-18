@@ -18,34 +18,45 @@ var opts struct {
 // Populated by build system
 var Version string = "pre0.1"
 
+const (
+	// Program executed successfully
+	codeSuccess = 0
+	// System error has occured
+	codeSystem = 1
+	// Invalid program usage
+	codeUsage = 2
+	// Error while parsing source file
+	codeParser = 3
+)
+
 func main() {
 	parser := flags.NewParser(&opts, flags.Default^flags.HelpFlag^flags.PrintErrors)
 	args, err := parser.Parse()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to parse arguments: %s\n", err.Error())
-		os.Exit(2)
+		os.Exit(codeUsage)
 	}
 
 	if opts.Help {
 		usage(os.Stdout)
-		os.Exit(0)
+		os.Exit(codeSuccess)
 	}
 	if opts.Version {
 		version()
-		os.Exit(0)
+		os.Exit(codeSuccess)
 	}
 
 	if !opts.Stdin && len(args) != 1 || opts.Stdin && len(args) != 0 {
 		usage(os.Stderr)
-		os.Exit(2)
+		os.Exit(codeUsage)
 	}
 
 	var outDir string
 	if opts.OutputDirectory == "" {
 		outDir, err = os.Getwd()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "system error: failed to get working directory: %s\n", err.Error())
-			os.Exit(1)
+			fmt.Fprintf(os.Stderr, "failed to get working directory: %s\n", err.Error())
+			os.Exit(codeSystem)
 		}
 	} else {
 		outDir = opts.OutputDirectory
