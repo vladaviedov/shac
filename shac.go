@@ -39,7 +39,7 @@ const (
 )
 
 // Placeholder asset paths
-const placeholderPattern = `"@\d@"`
+const placeholderPattern = `"@\d+@"`
 
 // Path to asset dir from output dir
 // TODO: convert into argument?
