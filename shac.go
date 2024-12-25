@@ -39,8 +39,11 @@ const (
 	codeParser = 3
 )
 
-// Placeholder asset paths
-const placeholderPattern = `"@\d+@"`
+// Asset placeholder pattern
+const assetPattern = `@\d+@`
+
+// Root placeholder pattern
+const rootPattern = `@\$@`
 
 // Path to asset dir from output dir
 // TODO: convert into argument?
@@ -210,18 +213,25 @@ func createAsset(assetDir string, path string) (string, error) {
 }
 
 func finalizeDocument(path string, r *bufio.Reader, assets []string) error {
-	reg, err := regexp.Compile(placeholderPattern)
-	if err != nil {
-		panic(err)
-	}
-
 	inputDoc, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}
 
-	doc := reg.ReplaceAllFunc(inputDoc, func(placeholder []byte) []byte {
-		indexStr := placeholder[2:(len(placeholder) - 2)]
+	assetDoc := replaceAssetPlaceholders(inputDoc, assets)
+	finalDoc := replaceRootPlaceholders(assetDoc)
+
+	return os.WriteFile(path, finalDoc, 0644)
+}
+
+func replaceAssetPlaceholders(input []byte, assets []string) []byte {
+	reg, err := regexp.Compile(assetPattern)
+	if err != nil {
+		panic(err)
+	}
+
+	return reg.ReplaceAllFunc(input, func(placeholder []byte) []byte {
+		indexStr := placeholder[1:(len(placeholder) - 1)]
 		index, err := strconv.Atoi(string(indexStr))
 
 		// Regex should ensure that number can be parsed
@@ -235,11 +245,16 @@ func finalizeDocument(path string, r *bufio.Reader, assets []string) error {
 		}
 
 		builder := new(strings.Builder)
-		builder.WriteString("\"")
 		builder.WriteString(filepath.Join(pathToAssets, assets[index]))
-		builder.WriteString("\"")
 		return []byte(builder.String())
 	})
+}
 
-	return os.WriteFile(path, doc, 0644)
+func replaceRootPlaceholders(input []byte) []byte {
+	reg, err := regexp.Compile(rootPattern)
+	if err != nil {
+		panic(err)
+	}
+
+	return reg.ReplaceAll(input, []byte(opts.RootURL))
 }
