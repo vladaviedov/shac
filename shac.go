@@ -22,6 +22,7 @@ var opts struct {
 	Stdin   bool `long:"stdin" short:"x"`
 
 	OutputDirectory string `long:"outdir" short:"d"`
+	RootURL         string `long:"root" short:"r"`
 }
 
 // Populated by build system
@@ -90,6 +91,10 @@ func main() {
 		outDir = opts.OutputDirectory
 	}
 
+	if opts.RootURL == "" {
+		opts.RootURL = opts.OutputDirectory
+	}
+
 	assetDir := filepath.Join(outDir, pathToAssets)
 	err = os.MkdirAll(assetDir, 0755)
 	if err != nil {
@@ -122,6 +127,7 @@ func usage(toFile *os.File) {
 	fmt.Fprintf(toFile, "\n")
 	fmt.Fprintf(toFile, "%-20s - %s\n", "-x, --stdin", "Read input file from stdin (source should be left empty)")
 	fmt.Fprintf(toFile, "%-20s - %s\n", "-d, --outdir <dir>", "Set output website directory (default: '.')")
+	fmt.Fprintf(toFile, "%-20s - %s\n", "-r, --root <url>", "Set root URL (default: output directory)")
 	fmt.Fprintf(toFile, "%-20s - %s\n", "-h, --help", "Show usage information")
 	fmt.Fprintf(toFile, "%-20s - %s\n", "-v, --version", "Show program version")
 }
