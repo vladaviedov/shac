@@ -27,7 +27,7 @@ var opts struct {
 }
 
 // Populated by build system
-var Version string = "0.2.0"
+var Version string = "0.3.0"
 
 const (
 	// Program executed successfully
