@@ -21,7 +21,8 @@ var opts struct {
 	Version bool `long:"version" short:"v"`
 	Stdin   bool `long:"stdin" short:"x"`
 
-	OutputDirectory string `long:"outdir" short:"d"`
+	OutputDirectory string `long:"outdir" short:"d" default:"."`
+	AssetDirectory  string `long:"assetdir" short:"a" default:"assets"`
 	RootURL         string `long:"root" short:"r"`
 }
 
@@ -44,10 +45,6 @@ const assetPattern = `@\d+@`
 
 // Root placeholder pattern
 const rootPattern = `@\$@`
-
-// Path to asset dir from output dir
-// TODO: convert into argument?
-const pathToAssets = "assets"
 
 func main() {
 	parser := flags.NewParser(&opts, flags.Default^flags.HelpFlag^flags.PrintErrors)
@@ -83,28 +80,20 @@ func main() {
 	}
 	defer inStream.Close()
 
-	var outDir string
-	if opts.OutputDirectory == "" {
-		outDir, err = os.Getwd()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to get working directory: %s\n", err.Error())
-			os.Exit(codeSystem)
-		}
-	} else {
-		outDir = opts.OutputDirectory
-	}
-
+	// Default root to output dir
 	if opts.RootURL == "" {
 		opts.RootURL = opts.OutputDirectory
 	}
 
-	assetDir := filepath.Join(outDir, pathToAssets)
+	// Create asset directory
+	assetDir := filepath.Join(opts.OutputDirectory, opts.AssetDirectory)
 	err = os.MkdirAll(assetDir, 0755)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create asset directory: %s\n", err.Error())
 		os.Exit(codeSystem)
 	}
 
+	// Check input file header
 	reader := bufio.NewReader(inStream)
 	name, err := pageName(reader)
 	if err != nil {
@@ -112,13 +101,15 @@ func main() {
 		os.Exit(codeParser)
 	}
 
+	// Process all asset tags
 	assets, err := processAssets(assetDir, reader)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 		os.Exit(codeParser)
 	}
 
-	err = finalizeDocument(filepath.Join(outDir, name), reader, assets)
+	// Create output document
+	err = finalizeDocument(filepath.Join(opts.OutputDirectory, name), reader, assets, assetDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create output file: %s\n", err.Error())
 		os.Exit(codeSystem)
@@ -128,11 +119,12 @@ func main() {
 func usage(toFile *os.File) {
 	fmt.Fprintf(toFile, "usage: %s [options] <source>\n", os.Args[0])
 	fmt.Fprintf(toFile, "\n")
-	fmt.Fprintf(toFile, "%-20s - %s\n", "-x, --stdin", "Read input file from stdin (source should be left empty)")
-	fmt.Fprintf(toFile, "%-20s - %s\n", "-d, --outdir <dir>", "Set output website directory (default: '.')")
-	fmt.Fprintf(toFile, "%-20s - %s\n", "-r, --root <url>", "Set root URL (default: output directory)")
-	fmt.Fprintf(toFile, "%-20s - %s\n", "-h, --help", "Show usage information")
-	fmt.Fprintf(toFile, "%-20s - %s\n", "-v, --version", "Show program version")
+	fmt.Fprintf(toFile, "%-25s - %s\n", "-x, --stdin", "Read input file from stdin (source should be left empty)")
+	fmt.Fprintf(toFile, "%-25s - %s\n", "-d, --outdir <dir>", "Set output website directory (default: '.')")
+	fmt.Fprintf(toFile, "%-25s - %s\n", "-r, --root <url>", "Set root URL (default: output directory)")
+	fmt.Fprintf(toFile, "%-25s - %s\n", "-a, --assetdir <dir>", "Set asset subdirectory name (default: 'assets')")
+	fmt.Fprintf(toFile, "%-25s - %s\n", "-h, --help", "Show usage information")
+	fmt.Fprintf(toFile, "%-25s - %s\n", "-v, --version", "Show program version")
 }
 
 func version() {
@@ -212,19 +204,19 @@ func createAsset(assetDir string, path string) (string, error) {
 	return hash, nil
 }
 
-func finalizeDocument(path string, r *bufio.Reader, assets []string) error {
+func finalizeDocument(path string, r *bufio.Reader, assets []string, assetDir string) error {
 	inputDoc, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}
 
-	assetDoc := replaceAssetPlaceholders(inputDoc, assets)
+	assetDoc := replaceAssetPlaceholders(inputDoc, assets, assetDir)
 	finalDoc := replaceRootPlaceholders(assetDoc)
 
 	return os.WriteFile(path, finalDoc, 0644)
 }
 
-func replaceAssetPlaceholders(input []byte, assets []string) []byte {
+func replaceAssetPlaceholders(input []byte, assets []string, assetDir string) []byte {
 	reg, err := regexp.Compile(assetPattern)
 	if err != nil {
 		panic(err)
@@ -245,7 +237,7 @@ func replaceAssetPlaceholders(input []byte, assets []string) []byte {
 		}
 
 		builder := new(strings.Builder)
-		builder.WriteString(filepath.Join(pathToAssets, assets[index]))
+		builder.WriteString(filepath.Join(assetDir, assets[index]))
 		return []byte(builder.String())
 	})
 }
