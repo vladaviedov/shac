@@ -137,6 +137,11 @@ func pageName(r *bufio.Reader) (string, error) {
 		return "", err
 	}
 
+	// Skip document if @ignore present at the start
+	if strings.HasPrefix(line, "@ignore") {
+		os.Exit(codeSuccess)
+	}
+
 	if !strings.HasPrefix(line, "@page") {
 		return "", errors.New("syntax error: no @page found at line 1")
 	}
