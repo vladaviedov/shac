@@ -109,7 +109,7 @@ func main() {
 	}
 
 	// Create output document
-	err = finalizeDocument(filepath.Join(opts.OutputDirectory, name), reader, assets, assetDir)
+	err = finalizeDocument(filepath.Join(opts.OutputDirectory, name), reader, assets)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create output file: %s\n", err.Error())
 		os.Exit(codeSystem)
@@ -209,19 +209,19 @@ func createAsset(assetDir string, path string) (string, error) {
 	return hash, nil
 }
 
-func finalizeDocument(path string, r *bufio.Reader, assets []string, assetDir string) error {
+func finalizeDocument(path string, r *bufio.Reader, assets []string) error {
 	inputDoc, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}
 
-	assetDoc := replaceAssetPlaceholders(inputDoc, assets, assetDir)
+	assetDoc := replaceAssetPlaceholders(inputDoc, assets)
 	finalDoc := replaceRootPlaceholders(assetDoc)
 
 	return os.WriteFile(path, finalDoc, 0644)
 }
 
-func replaceAssetPlaceholders(input []byte, assets []string, assetDir string) []byte {
+func replaceAssetPlaceholders(input []byte, assets []string) []byte {
 	reg, err := regexp.Compile(assetPattern)
 	if err != nil {
 		panic(err)
@@ -242,7 +242,7 @@ func replaceAssetPlaceholders(input []byte, assets []string, assetDir string) []
 		}
 
 		builder := new(strings.Builder)
-		builder.WriteString(filepath.Join(assetDir, assets[index]))
+		builder.WriteString(filepath.Join(opts.AssetDirectory, assets[index]))
 		return []byte(builder.String())
 	})
 }
