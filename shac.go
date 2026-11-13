@@ -20,6 +20,7 @@ var opts struct {
 	Help    bool `long:"help" short:"h"`
 	Version bool `long:"version" short:"v"`
 	Stdin   bool `long:"stdin" short:"x"`
+	Mkdir   bool `long:"mkdir" short:"p"`
 
 	OutputDirectory string `long:"outdir" short:"d" default:"."`
 	AssetDirectory  string `long:"assetdir" short:"a" default:"assets"`
@@ -99,6 +100,11 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 		os.Exit(codeParser)
+	}
+
+	// Make filepath if needed
+	if opts.Mkdir {
+		mkdirp(filepath.Join(opts.OutputDirectory, name))
 	}
 
 	// Process all asset tags
@@ -254,4 +260,9 @@ func replaceRootPlaceholders(input []byte) []byte {
 	}
 
 	return reg.ReplaceAll(input, []byte(opts.RootURL))
+}
+
+func mkdirp(path string) error {
+	dir := filepath.Dir(path)
+	return os.MkdirAll(dir, 0755)
 }
